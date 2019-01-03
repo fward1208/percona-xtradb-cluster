@@ -3,15 +3,10 @@
 export LC_ALL=C
 
 days_of_backups=14
-backup_owner="root"
-parent_dir="/backups/mysql"
-server=$(hostname)
-defaults_file="/etc/mysql/backup.cnf"
-todays_dir="${parent_dir}/${server}/$(date +%F)"
-mkdir -p $todays_dir
+parent_dir="${PWD}/backups"
+todays_dir="${parent_dir}/$(date +%F)"
 log_file="${todays_dir}/backup-progress.log"
 touch $log_file
-encryption_key_file="${parent_dir}/encryption_key"
 now="$(date +%m-%d-%Y_%H-%M-%S)"
 processors="$(nproc --all)"
 
@@ -23,31 +18,18 @@ error () {
 
 trap 'error "An unexpected error occurred."' ERR
 
-sanity_check () {
-    # Check user running the script
-    if [ "$(id --user --name)" != "$backup_owner" ]; then
-        error "Script can only be run as the \"$backup_owner\" user"
-    fi
-
-    # Check whether the encryption key file is available
-    if [ ! -r "${encryption_key_file}" ]; then
-        error "Cannot read encryption key at ${encryption_key_file}"
-    fi
-}
-
 set_options () {
     # List the xtrabackup arguments
     xtrabackup_args=(
-        "--defaults-file=${defaults_file}"
+        "--host=${HOST}"
+        "--user=${MYSQL_USER}"
+        "--password=${MYSQL_ROOT_PASSWORD}"
         "--backup"
         "--extra-lsndir=${todays_dir}"
         "--compress"
         "--stream=xbstream"
-        "--encrypt=AES256"
-        "--encrypt-key-file=${encryption_key_file}"
         "--parallel=${processors}"
         "--compress-threads=${processors}"
-        "--encrypt-threads=${processors}"
         "--slave-info"
     )
 
@@ -64,7 +46,7 @@ set_options () {
 
 rotate_old () {
     # Remove the oldest backup in rotation
-    day_dir_to_remove="${parent_dir}/$(date --date="${days_of_backups} days ago" +%a)"
+    day_dir_to_remove="${parent_dir}/$(date --date="${days_of_backups} days ago" +%F)"
 
     if [ -d "${day_dir_to_remove}" ]; then
         rm -rf "${day_dir_to_remove}"
@@ -80,7 +62,12 @@ take_backup () {
     mv "${todays_dir}/${backup_type}-${now}.xbstream.incomplete" "${todays_dir}/${backup_type}-${now}.xbstream"
 }
 
-sanity_check && set_options && rotate_old && take_backup
+sync_backup () {
+    if [ -e ~/.mc/config.json ]; then
+        mc mirror --remove --overwrite "${parent_dir}"/ "${MINIO_BUCKET}"
+    fi
+
+set_options && rotate_old && take_backup && sync_backup
 
 # Check success and print message
 if tail -1 "${log_file}" | grep -q "completed OK"; then
