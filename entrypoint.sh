@@ -162,7 +162,7 @@ ipaddr=$(hostname -i | awk ' { print $1 } ')
 # on first join, pmm-admin forces the use of the ip address. the second config setup adds the host as the mapping
 pmm-admin config --server pmmserver:443 --server-user pmm --server-password pmm --server-insecure-ssl --force --client-address $(hostname)
 pmm-admin check-network
-pmm-admin add mysql --host $(hostname) --user root --password D1splay@dmin --query-source slowlog $(hostname)
+pmm-admin add mysql --host $(hostname) --user root --password D1splay@dmin --query-source perfschema $(hostname)
 
 #--log-error=${DATADIR}error.log
 exec mysqld --user=mysql --wsrep_cluster_name=$CLUSTER_NAME --wsrep_cluster_address="gcomm://$cluster_join" --wsrep_sst_method=xtrabackup-v2 --wsrep_sst_auth="xtrabackup:$XTRABACKUP_PASSWORD" --wsrep_node_address="$ipaddr" $CMDARG
