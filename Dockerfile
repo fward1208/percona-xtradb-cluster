@@ -53,5 +53,5 @@ LABEL com.percona.version="5.7"
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 3306
-USER root 
+USER 1001 
 CMD [""]
